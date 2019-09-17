@@ -244,19 +244,18 @@ def annotationGenerator(n: int):
     elif n == 5:
         #1 1 0 0 0 is the only one
         yield [1,1,0,0,0]
+        yield [1,0,1,0,0]
 
     else:
-        curr = [1, 0]*(int((n-3)/2))
+        curr = [1, 0]*(int((n-1)/2))
         curr.insert(0,0)
-        m = (n-3)-1
+        m = (n-1)-1
         counter = 0
         while 1: 
             #Modifying the output so it's a valid annotation
             #Needs to start with a speedup and end with two slowdowns 
             #because the first speedup adds two quantifiers
             output = curr[1:]
-            output.insert(0, 1)
-            output.append(0)
             output.append(0)
             counter += 1
             yield output
@@ -267,7 +266,7 @@ def annotationGenerator(n: int):
                 m = m-1
             else:
                 j = m-1
-                k = (n-3)-1
+                k = (n-1)-1
                 while curr[j] == 1:
                     curr[j] = 0
                     curr[k] = 1
@@ -276,7 +275,7 @@ def annotationGenerator(n: int):
                 if j == 0: 
                     break
                 curr[j] = 1
-                m = (n-3)-1
+                m = (n-1)-1
 
 
 def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> Tuple[float, Any]:
@@ -322,7 +321,7 @@ if __name__ == "__main__":
     parser.add_argument("--proof_length", required = True, type = int, action = "store", help = "finds the best lower bounds using proofs of this length")
     parser.add_argument("--search_start", default = 1, type = float, action = "store", help = "what value of c to start searching from")
     parser.add_argument("--search_cap", default = 3, type = int, action = "store", help = "number of rounds of doubling we allow")
-    parser.add_argument("--search_depth", default = 4, type = int, action = "store", help = "number of iterations of binary search we allow")
+    parser.add_argument("--search_depth", default = 6, type = int, action = "store", help = "number of iterations of binary search we allow")
 
     args = parser.parse_args()
 
