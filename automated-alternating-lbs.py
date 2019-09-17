@@ -15,37 +15,42 @@ def annotationGenerator(n: int):
     """
         n: an integer
 
+        yields: a list of integers 
+
         A generator that yields valid proof annotations of length n. We require n to be odd because any valid 
         proof has odd length (first speedup adds two quantifiers, every subsequent step changes quantifier count
         by one).  
+
+        1 denotes a SPEEDUP
+        0 denotes a SLOWDOWN
 
         Procedure for generating strings of well-balanced parentheses taken from Knuth Vol. 4, Pre-Fascicle 4a, 
         p. 3, which was taken from I. Semba IPL 12 , 188-192, 1981. 
     """
     assert(n%2 == 1)
-    curr = ['0', '1']*(n-3)
-    curr.insert(0,'1')
+    curr = [0, 1]*(n-3)
+    curr.insert(0,1)
     m = 2*n-1
     while 1: 
         output = curr[1:]
-        output.insert(0, '1')
-        output.append(['0', '0'])
+        output.insert(0, 1)
+        output.append([0, 0])
         yield output
-        curr[m] = '1'
-        if curr[m-1] == '1':
-            curr[m-1] = '0'
+        curr[m] = 1
+        if curr[m-1] == 1:
+            curr[m-1] = 0
             m = m-1
         else:
             j = m-1
             k = 2*n-1
-            while curr[j] == '0':
-                curr[j] = '1'
-                curr[k] = '0'
+            while curr[j] == 0:
+                curr[j] = 1
+                curr[k] = 0
                 j = j-1
                 k = k-2
             if j == 0: 
                 break
-            curr[j] = '0'
+            curr[j] = 0
             m = 2*n-1
 
 
@@ -58,76 +63,105 @@ def printProof(c: float, proof: List[List[Tuple[int, float, float]]]) -> None:
     pass
 
 
-def initialize(n: int, m: int) -> Tuple[np.ndarray, np.ndarray]:
-
-
-    ineq_mtx_rows = []
-    ineq_constants = []
-    eq_mtx_rows = []
-    eq_constants = []
-
-
-    #a_{0,0} >=1,       
-    row = np.zeros(num_vars) 
-    row[indexFromVariableTuple('a', 0, 0)] = 1
-    ineq_mtx_rows.append(row)
-    ineq_constants.append(1)
-
-    #b_{0,0} = 1
-    eq_constants.append(1)
-
-    #a_{n-1, 0} >= 1    
-    row = np.zeros(num_vars) 
-    row[indexFromVariableTuple('a', n-1, 0)] = 1
-    ineq_mtx_rows.append(row)
-    ineq_constants.append(1)
-
-    #b_{n-1} = 1
-    eq_constants.append(1)
-
-
-    #Constraints for the first speedup
-
-    #    a_{1,0} = a_{0,0}-x_1 
-    #<=> a_{1,0} - a_{0,0} + x_1 = 0
-    row = np.zeros(num_vars) 
-    row[indexFromVariableTuple('a', 1, 0)] = 1
-    row[indexFromVariableTuple('a', 0, 0)] = -1
-    row[indexFromVariableTuple('x', 1)] = 1
-    eq_mtx_rows.append(row)
-    eq_constants.append(0)
-
-
-
-    #b_{1,0} = 1
-    #a_{1,1} = 0
-    #b_{1,1} >= x_1
-    #b_{1,1} >= 1
-    #a_{1,2} = x_1
-    #b_{1,2} = 1
-
-    
-
-    
-    
-def speedup(m: int, first_line = False: bool) -> Tuple[np.ndarray, np.ndarray]:
-    pass
-
-def slowdown(m: int) -> Tuple[np.ndarray, np.ndarray]:
-    pass
-
-def indexFromVariableTuple(num_doubles: int, letter: str, line_idx: int, double_idx=0: int) -> int:
+def initialize(lp_problem: LpProblem, n: int, m: int) -> LpProblem: 
     """
-        num_doubles: the maximum number of doubles of variables needed for any line of this proof
-        letter: character in {a,b,x}
-        line_idx: the line of the proof in which this variable is introduced. ZERO INDEXED
-        double_idx: the quantifier to which this variable corresponds. ZERO INDEXED. 
-        
-        
+        lp_problem: A pulp.LpProblem instance
+        n: an integer, representing the number of lines in the proof
+        m: an integer, representing the maximum number of clauses in any line
+
+        returns: A pulp.LpProblem instance
+
+        Appends the initial constraints on the LP, and those for the first speedup step. 
+    """
+    #Constraints on the first and last lines, which are of the form TSP[n^a]. 
+    lp += a[(0,0)] >= 1
+    lp += b[(0,0)] = 1
+
+    lp += a[(n-1, 0)] >= 1
+    lp += b[(n-1, 0)] = 1
+
+    for k in range(1,m):
+        lp += a[(0,k)] = 0
+        lp += b[(0,k)] = 0
+        lp += a[(n-1,k)] = 0
+        lp += b[(n-1,k)] = 0
+    
+    #Constraints for the first speedup
+    lp += a[(1,0)] = a[(0,0)]-x[1] 
+    lp += b[(1,0)] = 1
+    lp += a[(1,1)] = 0
+    lp += b[(1,1)] >= x[1]
+    lp += b[(1,1)] >= 1 
+    lp += a[(1,2)] = x[1]
+    lp += b[(1,2)] = 1
+
+    for k in range(3, m): 
+        lp += a[(1,k)] = 0
+        lp += b[(1,k)] = 0
+
+def speedup(lp_problem: LpProblem, i: int) -> LpProblem:
+    """
+        lp_problem: A pulp.LpProblem instance
+        i: an integer, representing the current proof line
+
+        returns: A pulp.LpProblem instance
+
+        Appends the constraints corresponding to this speedup step to the LP
+    """
+
+    lp += a[(i,0)] >= 1
+    lp += a[(i,0)] >= a[(i-1,0)] - x[i]
+    lp += b[(i,0)] >= b[(i-1,0)]
+    lp += a[(i,1)] = 0
+    lp += b[(i,1)] >= x[i]
+    lp += b[(i,1)] >= b[(i-1,0)]
+    lp += a[(i,2)] >= a[(i-1,1)] 
+    lp += a[(i,2)] >= x[i]
+    lp += b[(i,2)] >= b[(i-1,1)]
+    
+    for k in range(3,m):
+        lp += a[(i,k)] = a[(i-1,k-1)]
+        lp += b[(i,k)] = b[(i-1,k-1)] 
+
+
+def slowdown(lp_problem: LpProblem, i: int, c: float) -> LpProblem:
+    """
+        lp_problem: A pulp.LpProblem instance
+        i: an integer, representing the current proof line
+        c: a float, representing the exponent in the assumption NTIME[n] \subset TSP[n^c, log n]
+
+        returns: A pulp.LpProblem instance
+
+        Appends the constraints corresponding to this slowdown step to the LP
+    """
+
+    lp += a[(i,0)] >= c*a[(i-1,0)]
+    lp += a[(i,0)] >= c*a[(i-1,1)]
+    lp += a[(i,0)] >= c*b[(i-1,0)]
+    lp += a[(i,0)] >= c*b[(i-1,1)]
+    lp += b[(i,0)] = b[(i-1,1)]
+
+    for k in range(1,m-1):
+        lp += a[(i,k)] = a[(i-1,k+1)]
+        lp += b[(i,k)] = b[(i-1,k+1)]
+        lp += a[(i,m)] = 0 
+        lp += b[(i,m)] = 0
+
+def buildLinearProgram(annotation: List[int], c: float) -> pulp.LpProblem:
+    """
+        annotation: A list of 0/1 bits encoding an annotation. 0 indicates a slowdown step, 1 indicates a speedup step
+        c: the exponent against which we wish to prove lower bounds
+
+        return: A pulp.LpProblem linear program to be run. 
+
+        Given a bit list encoding an annotation, outputs a pair of numpy arrays. The first encodes all the inequality constraints 
+        for a linear program, the second encodes the equality constraints. 
+
+
         We count quantifiers from the right to the left, so the outermost quantifier has the highest index. 
 
-        The number of lines of the proof is equal to the number of inclusions PLUS ONE. Think of it as the number of lines
-        if the proof were written as
+        The number of lines of the proof is equal to the number of inclusions (i.e. the length of the annotation) 
+        PLUS ONE. Think of it as the number of lines if the proof were written as
 
         TSP[n^a] 
         \subset A_1
@@ -144,64 +178,41 @@ def indexFromVariableTuple(num_doubles: int, letter: str, line_idx: int, double_
         also has a variable x_i which corresponds to the "speedup parameter" if the rule applied in that line is a speedup rule. 
         Otherwise x_i is unused. 
 
-        Each line of the proof has a block of variables of size 2*num_doubles + 1. The first index in the ith block is assigned 
-        to x_i, and the subsequent entries are a_{i,0}, b_{i,0}, a_{i,1}, b_{i,1}, ... , a_{i,num_doubles-1}, b_{i, num_doubles-1}
     """
-
-    if letter == 'x':
-        return line_idx*(2*num_doubles+1)
-    elif letter == 'a':
-        shift = 0
-        return line_idx*(2*num_doubles+1)+2*double_idx+shift+1
-    elif letter == 'b':
-        shift = 1
-        return line_idx*(2*num_doubles+1)+2*double_idx+shift+1
-    else:
-        raise ValueError("Letter was not one of {a, b, x}")
-        return 0
-
-
-def buildLinearProgram(annotation: List[int], c: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """
-        annotation: A list of 0/1 bits encoding an annotation. 0 indicates a slowdown step, 1 indicates a speedup step
-        return: four numpy arrays. Two are inequalities, two are equalities. 
-
-        Given a bit list encoding an annotation, outputs a pair of numpy arrays. The first encodes all the inequality constraints 
-        for a linear program, the second encodes the equality constraints. 
-    """
-    n = len(annotation)
+    n = len(annotation)+1
     m = 0
     j = 0 
     for i in range(n):
-        if annotation[i] == '0':
+        if annotation[i] == 0:
             j  += 1
             m = max(m,j)
         j -= 1
-    m *= 3
+    #We add one for the variables for the TSP[n^a] bit 
+    m += 1
+
+    a = pulp.LpVariable.dicts("a", [(i,j) for i in range(n) for j in range(m)], 0) 
+    b = pulp.LpVariable.dicts("b", [(i,j) for i in range(n) for j in range(m)], 0) 
+    x = pulp.LpVariable.dicts("x", [i for i in range(n), 0) 
 
 
+    lp_problem = pulp.LpProblem("imnotsurewhathisdoes", pulp.LpMaximize)
 
-    [(i,j) for i in range(num_lines)
-    #Initial case
-    ineq_matrix = initialize(m)[0]
-    eq_matrix = initialize(m)[1]
+    #Objective function (we don't need to optimize anything cause we're just checking for feasibility
+    lp_problem += 0
 
-    for i in range(n):
-        if i == 0:
-            #first speedrun
-            np.append([ineq_matrix, speedup(m, True)[0]], axis=0)
-            np.append([eq_matrix, speedup(m, True)[1]], axis=0)
-        elif annotation[i] == '0':
-            #speedup
-            np.append([ineq_matrix, speedup(m)[0]], axis=0)
-            np.append([eq_matrix, speedup(m)[1]], axis=0)
+    #Initial conditions and first speedup
+    lp_problem += initialize(lp_problem)
 
-        elif annotation[i] == '1':
+    #Everything else, skipping the first speedup since it's in initialize
+    for op in annotation[1:]:
+        if op == 0:
             #slowdown
-            np.append([ineq_matrix, slowdown(m)[0]], axis=0)
-            np.append([eq_matrix, slowdown(m)[1]], axis=0)
+            lp_problem += slowdown(lp_problem)
+        else:
+            #speedup
+            lp_problem += speedup(lp_problem)
 
-
+    return lp_problem
 
 
 def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> Tuple[float, 'scipy.optimize.OptimizeResult']:
@@ -213,12 +224,14 @@ def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> 
         return: the largest value of c that yielded a feasible program and the corresponding result
     """
     if depth == 0:
-        if scipy.optimize.linprog(buildLinearProgram(annotation, high)).success is True:
-            return high, scipy.optimize.linprog(buildLinearProgram(annotation, high))
-        return low, scipy.optimize.linprog(buildLinearProgram(annotation, low))
+        lp_result = buildLinearProgram(annotation, high).solve()
+        if pulp.LpStatus[lp_result.status] is 1:
+            return high, lp_result
+        else:
+            return low, buildLinearProgram(annotation, low).solve()
 
     mid = (high+low)/2
-    if scipy.optimize.linprog(buildLinearProgram(annotation, mid)).success is True:
+    if pulp.LpStatus[buildLinearProgram(annotation, mid).solve().status] is 1:
         return binarySearch(annotation, mid, high, depth-1)
     else:
         return binarySearch(annotation, low, mid, depth-1)
@@ -259,25 +272,25 @@ if __name__ == "__main__":
         c = search_start
 
         #Check to make sure the search start is fine
-        if scipy.optimize.linprog(buildLinearProgram(annotation, c)).success is not True:
+        if pulp.LpStatus[buildLinearProgram(annotation, c).solve().status] is not 1:
             raise ValueError("Search start value was too high - no lower bounds could be found")
         
         for i in range(search_cap):
             c *= 2
-            lp_result = scipy.optimize.linprog(buildLinearProgram(annotation, c)) 
-            if lp_result.success is False:
+            lp_result = buildLinearProgram(annotation, c).solve()
+            if lp_result.status is not 1:
                 #There's no feasible linear program at this value of c.
                 #This means that we should search between c/2 and c
                 annotation_best_c, lp_result = binarySearch(annotation, c/2, c, search_depth)
-                assert(scipy.optimize.linprog(buildLinearProgram(annotation, annotation_best_c)) is True)
+                assert(lp_result.status is 1)
 
                 if annotation_best_c > best_c:
                     best_c = annotation_best_c
                     best_annotation = annotation
-                    best_proof = buildProof(annotation, lp_result.x)
+                    best_params = lp_result.variables()
             
-        print("Maxed out the search cap on annotation: ", ''.join(annotation))
+        print("Maxed out the search cap on annotation: ", ''.join(best_annotation))
 
-    printProof(best_c, best_annotation, best_proof)
+    #printProof(best_c, best_annotation, best_params)
 
 
