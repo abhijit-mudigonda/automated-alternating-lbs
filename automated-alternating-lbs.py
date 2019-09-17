@@ -46,8 +46,8 @@ class buildLinearProgram:
     def __init__(self, annotation: List[int], c: float) -> None:
         self.m = buildLinearProgram.maxNumClauses(annotation)
         self.n = len(annotation)+1
-        self.a = pulp.LpVariable.dicts("a", [(i,j) for i in range(self.n) for j in range(self.m)], 0) 
-        self.b = pulp.LpVariable.dicts("b", [(i,j) for i in range(self.n) for j in range(self.m)], 0) 
+        self.a = pulp.LpVariable.dicts("a", [(i,j) for i in range(self.n) for j in range(self.m)]) 
+        self.b = pulp.LpVariable.dicts("b", [(i,j) for i in range(self.n) for j in range(self.m)]) 
         self.c = c
         self.annotation = annotation
         self.x = pulp.LpVariable.dicts("x", [i for i in range(self.n)], 0) 
@@ -91,7 +91,7 @@ class buildLinearProgram:
 
         #Everything else, skipping the first speedup since it's in initialize
         for idx, op in enumerate(self.annotation[1:]):
-            i = idx+1
+            i = idx+2
             if op == 0:
                 #slowdown
                 self.addSlowdownConstraints(i)
@@ -108,10 +108,11 @@ class buildLinearProgram:
         self.addObjective()
         self.addAnnotationConstraints()
         self.lp_problem.solve()
-        print(self.lp_problem.variables())
-        if pulp.LpStatus[self.lp_problem.status] == 1:
+        if pulp.LpStatus[self.lp_problem.status] == "Optimal":
             return True
-        return False
+        elif pulp.LpStatus[self.lp_problem.status] == "Infeasible":
+            return False
+        raise ValueError
 
     def getProofParams(self):
         """
@@ -120,13 +121,14 @@ class buildLinearProgram:
         """
 
         #if lp is unsolved
-        if pulp.LpStatus[self.lp_problem] == 0: 
+        if pulp.LpStatus[self.lp_problem.status] == "Not Solved": 
             self.addObjective()
             self.addAnnotationConstraints()
+            self.lp_problem.solve()
 
         #if the solved program isn't feasible, fail
-        assert(pulp.LpStatus[self.lp_problem] == 1)
-        return self.lp_problem.solve().variables()
+        assert(pulp.LpStatus[self.lp_problem.status] == "Optimal")
+        return self.lp_problem.variables()
      
     def addInitialConstraints(self) -> None:
         """
@@ -146,6 +148,9 @@ class buildLinearProgram:
             self.lp_problem += self.a[(self.n-1,k)] == 0
             self.lp_problem += self.b[(self.n-1,k)] == 0
         
+        #Constraint so that we actually get a lower bound
+        self.lp_problem += self.a[(0,0)] >= self.a[(self.n-1,0)]
+
         #Constraints for the first speedup
         self.lp_problem += self.a[(1,0)] == self.a[(0,0)]-self.x[1] 
         self.lp_problem += self.b[(1,0)] == 1
@@ -232,40 +237,49 @@ def annotationGenerator(n: int):
         p. 3, which was taken from I. Semba IPL 12 , 188-192, 1981. 
     """
     assert(n%2 == 1)
-    curr = [0, 1]*(int((n-3)/2))
-    curr.insert(0,1)
-    m = 2*int(((n-3)/2))-1
-    counter = 0
-    while 1: 
-        #Modifying the output so it's a valid annotation
-        #Needs to start with a speedup and end with two slowdowns 
-        #because the first speedup adds two quantifiers
-        output = curr[1:]
-        output.insert(0, 1)
-        output.append(0)
-        output.append(0)
-        counter += 1
-        yield output
-        curr[m] = 1
-        if curr[m-1] == 1:
-            curr[m-1] = 0
-            m = m-1
-        else:
-            j = m-1
-            k = 2*int(((n-3)/2))-1
-            while curr[j] == 0:
+    if n == 3:
+        #1 0 0 is the only one
+        yield [1,0,0]
+
+    elif n == 5:
+        #1 1 0 0 0 is the only one
+        yield [1,1,0,0,0]
+
+    else:
+        curr = [1, 0]*(int((n-3)/2))
+        curr.insert(0,0)
+        m = (n-3)-1
+        counter = 0
+        while 1: 
+            #Modifying the output so it's a valid annotation
+            #Needs to start with a speedup and end with two slowdowns 
+            #because the first speedup adds two quantifiers
+            output = curr[1:]
+            output.insert(0, 1)
+            output.append(0)
+            output.append(0)
+            counter += 1
+            yield output
+
+            curr[m] = 0
+            if curr[m-1] == 0:
+                curr[m-1] = 1
+                m = m-1
+            else:
+                j = m-1
+                k = (n-3)-1
+                while curr[j] == 1:
+                    curr[j] = 0
+                    curr[k] = 1
+                    j = j-1
+                    k = k-2
+                if j == 0: 
+                    break
                 curr[j] = 1
-                curr[k] = 0
-                j = j-1
-                k = k-2
-            if j == 0: 
-                break
-            curr[j] = 0
-            m = 2*int((n-3)/2)-1
+                m = (n-3)-1
 
 
-
-def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> Tuple[float, 'scipy.optimize.OptimizeResult']:
+def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> Tuple[float, Any]:
     """
         annotation: A list of 0/1 bits encoding an annotation. 0 indicates a slowdown step, 1 indicates a speedup step
         high: the maximum allowable value in binary search
@@ -273,18 +287,21 @@ def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> 
         depth: the maximum search depth
         return: the largest value of c that yielded a feasible program and the corresponding result
     """
+    #If even the smallest exponent in the range is infeasible then fail out immediately
+    #This guarantees that the output will be feasible. This function shouldn't be called on 
+    #infeasible ranges (TODO maybe this is bad behavior)
+    assert(buildLinearProgram(annotation, low).isFeasible() is True)
     if depth == 0:
         if buildLinearProgram(annotation, high).isFeasible() is True:
             return high, buildLinearProgram(annotation, high).getProofParams()
         else:
-            return low, buildLinearProgram(annotation, high).getProofParams()
+            return low, buildLinearProgram(annotation, low).getProofParams()
 
     mid = (high+low)/2
     if buildLinearProgram(annotation, mid).isFeasible() is True:
         return binarySearch(annotation, mid, high, depth-1)
     else:
         return binarySearch(annotation, low, mid, depth-1)
-
 
 
 if __name__ == "__main__":
@@ -304,8 +321,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--proof_length", required = True, type = int, action = "store", help = "finds the best lower bounds using proofs of this length")
     parser.add_argument("--search_start", default = 1, type = float, action = "store", help = "what value of c to start searching from")
-    parser.add_argument("--search_cap", default = 4, type = int, action = "store", help = "number of rounds of doubling we allow")
-    parser.add_argument("--search_depth", default = 5, type = int, action = "store", help = "number of iterations of binary search we allow")
+    parser.add_argument("--search_cap", default = 3, type = int, action = "store", help = "number of rounds of doubling we allow")
+    parser.add_argument("--search_depth", default = 4, type = int, action = "store", help = "number of iterations of binary search we allow")
 
     args = parser.parse_args()
 
@@ -319,26 +336,27 @@ if __name__ == "__main__":
     best_annotation = []
     
     for annotation in annotationGenerator(proof_length):
+        #If even the smallest value under consideration fails to yield a feasible program 
+        #for this annotation then we shouldn't bother with the binary searching
+        if buildLinearProgram(annotation, search_start).isFeasible() is False:
+            print("this annotation failed from the start")
+            continue 
         c = search_start
-
-        #Check to make sure the search start is fine
-        if buildLinearProgram(annotation, c).isFeasible() is not True:
-            raise ValueError("Search start value was too high - no lower bounds could be found")
-        
         for i in range(search_cap):
             c *= 2
             if buildLinearProgram(annotation, c).isFeasible() is False:
                 #There's no feasible linear program at this value of c.
                 #This means that we should search between c/2 and c
                 annotation_best_c, annotation_best_params = binarySearch(annotation, c/2, c, search_depth)
-                assert(buildLinearProgram(annotation, annotation_best_c).isFeasible() is True)
-
+                print("The best c for this annotation was: ", annotation_best_c)
                 if annotation_best_c > best_c:
                     best_c = annotation_best_c
                     best_annotation = annotation
                     best_params = annotation_best_params
-            
-        print("Maxed out the search cap on annotation: ", ''.join(best_annotation))
+
+                break
+    print("The best annotation was: ", best_annotation)
+    print("The best value of c was: ", best_c) 
 
     #printProof(best_c, best_annotation, best_params)
 
