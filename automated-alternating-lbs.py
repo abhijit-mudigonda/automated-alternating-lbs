@@ -53,8 +53,6 @@ class buildLinearProgram:
         self.x = pulp.LpVariable.dicts("x", [i for i in range(self.n)], 0) 
         self.lp_problem = pulp.LpProblem("imnotsurewhathisdoes", pulp.LpMinimize)
 
-        print("Building for the annotation: ", annotation, "and exponent ", c, ". The value of n is: ", self.n, " and the value of m is: ", self.m)
-
     @staticmethod
     def maxNumClauses(annotation: List[int]) -> int:
         """
@@ -211,15 +209,6 @@ class buildLinearProgram:
         self.lp_problem += self.a[(i,self.m-1)] == 0 
         self.lp_problem += self.b[(i,self.m-1)] == 0
 
-
-def printProof(c: float, proof: List[List[Tuple[int, float, float]]]) -> None: 
-    """
-        c: a floating point number, the exponent in the assumption NTIME[n] subset TSP[n^c]
-        proof: a
-    """
-    pass
-
-
 def annotationGenerator(n: int):
     """
         n: an integer
@@ -318,7 +307,7 @@ if __name__ == "__main__":
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--proof_length", required = True, type = int, action = "store", help = "finds the best lower bounds using proofs of this length")
+    parser.add_argument("--proof_length", required = True, type = int, action = "store", help = "finds the best lower bounds using proofs of this length. Must be even")
     parser.add_argument("--search_start", default = 1, type = float, action = "store", help = "what value of c to start searching from")
     parser.add_argument("--search_cap", default = 3, type = int, action = "store", help = "number of rounds of doubling we allow")
     parser.add_argument("--search_depth", default = 6, type = int, action = "store", help = "number of iterations of binary search we allow")
@@ -330,15 +319,15 @@ if __name__ == "__main__":
     search_cap = args.search_cap
     search_depth = args.search_depth
 
+    assert(proof_length % 2 == 0)
 
-    best_c = search_start
-    best_annotation = []
+    best_c = search_start-0.01
+    best_annotations = []
     
-    for annotation in annotationGenerator(proof_length):
+    for annotation in annotationGenerator(proof_length-1):
         #If even the smallest value under consideration fails to yield a feasible program 
         #for this annotation then we shouldn't bother with the binary searching
         if buildLinearProgram(annotation, search_start).isFeasible() is False:
-            print("this annotation failed from the start")
             continue 
         c = search_start
         for i in range(search_cap):
@@ -347,16 +336,16 @@ if __name__ == "__main__":
                 #There's no feasible linear program at this value of c.
                 #This means that we should search between c/2 and c
                 annotation_best_c, annotation_best_params = binarySearch(annotation, c/2, c, search_depth)
-                print("The best c for this annotation was: ", annotation_best_c)
                 if annotation_best_c > best_c:
                     best_c = annotation_best_c
-                    best_annotation = annotation
+                    best_annotations = [annotation]
                     best_params = annotation_best_params
+                elif annotation_best_c == best_c:
+                    best_annotations.append(annotation)
 
                 break
-    print("The best annotation was: ", best_annotation)
+    print("The best annotation was: ", best_annotations)
     print("The best value of c was: ", best_c) 
 
-    #printProof(best_c, best_annotation, best_params)
 
 
