@@ -344,7 +344,7 @@ if __name__ == "__main__":
                     best_annotations.append(annotation)
 
                 break
-    print("The best annotation was: ", best_annotations)
+    print("The best annotations were: ", best_annotations)
     print("The best value of c was: ", best_c) 
 
 
