@@ -3,7 +3,7 @@
 """
 Code for automating the synthesis of alternation-tradingi proofs
 following the ideas of http://www.cs.cmu.edu/~ryanw/automated-lbs.pdf
-(c) Ryan Williams 2010
+and based on the Maple code by Ryan Williams http://www.cs.cmu.edu/~ryanw/LB.txt
 """
 
 import pulp
