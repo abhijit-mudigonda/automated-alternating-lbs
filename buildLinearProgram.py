@@ -15,7 +15,7 @@ class buildLinearProgram:
         and there are methods to add constraints and objective functions. In general, <buildLineearProgramisFeasible> is the
         best way to check if a particular annotation can be used to generate a proof with exponent c.
     """
-    def __init__(self, annotation: List[int], c: float) -> None:
+    def __init__(self, annotation: List[int], c: float, quantum = False) -> None:
         """
             annotation: A list of 0/1 bits encoding an annotation. 0 indicates a slowdown step, 1 indicates a speedup step
             c: the exponent against which we wish to prove lower bounds
@@ -37,6 +37,8 @@ class buildLinearProgram:
         self.annotation = annotation
         self.x = pulp.LpVariable.dicts("x", [i for i in range(self.n)], 0) 
         self.lp_problem = pulp.LpProblem("imnotsurewhathisdoes", pulp.LpMinimize)
+        self.quantum = quantum
+
 
     @staticmethod
     def maxNumClauses(annotation: List[int]) -> int:
@@ -80,7 +82,13 @@ class buildLinearProgram:
             i = idx+2
             if op == 0:
                 #slowdown
-                self.addSlowdownConstraints(i)
+                """
+                if self.quantum is True:
+                    self.addGroDownConstraints(i)
+                else:
+                    self.addSlowdownConstraints(i)
+                """
+                self.addRAMSlowdownConstraints(i)
             else:
                 #speedup
                 self.addSpeedupConstraints(i)
@@ -152,11 +160,6 @@ class buildLinearProgram:
 
     def addSpeedupConstraints(self, i: int) -> None:
         """
-            lp_problem: A pulp.LpProblem instance
-            i: an integer, representing the current proof line
-
-            returns: A pulp.LpProblem instance
-
             Appends the constraints corresponding to this speedup step to the LP
         """
 
@@ -177,12 +180,6 @@ class buildLinearProgram:
 
     def addSlowdownConstraints(self, i: int) -> None:
         """
-            lp_problem: A pulp.LpProblem instance
-            i: an integer, representing the current proof line
-            c: a float, representing the exponent in the assumption NTIME[n] \subset TSP[n^c, log n]
-
-            returns: A pulp.LpProblem instance
-
             Appends the constraints corresponding to this slowdown step to the LP
         """
         self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,0)]
@@ -196,5 +193,40 @@ class buildLinearProgram:
             self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
         self.lp_problem += self.a[(i,self.m-1)] == 0 
         self.lp_problem += self.b[(i,self.m-1)] == 0
+
+    def addRAMSlowdownConstraints(self, i: int) -> None:
+        """
+            Appends the constraints corresponding to this slowdown step to the LP
+        """
+        self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,0)]
+        self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,1)]
+        self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,0)]
+        self.lp_problem += self.b[(i,0)] == self.b[(i-1,1)]
+
+        for k in range(1,self.m-1):
+            self.lp_problem += self.a[(i,k)] == self.a[(i-1,k+1)]
+            self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
+        self.lp_problem += self.a[(i,self.m-1)] == 0 
+        self.lp_problem += self.b[(i,self.m-1)] == 0
+
+
+
+    def addGroDownConstraints(self, i: int) -> None:
+        """
+           Appends the constraints corresponding to this slowdown step to the LP
+        """
+        self.lp_problem += self.a[(i,0)] >= self.c*(self.a[(i-1,0)] - 0.5*self.x[i])
+        self.lp_problem += self.a[(i,0)] >= self.c*self.x[i]
+        self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,1)]
+        self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,0)]
+        self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,1)]
+        self.lp_problem += self.b[(i,0)] == self.b[(i-1,1)]
+
+        for k in range(1,self.m-1):
+            self.lp_problem += self.a[(i,k)] == self.a[(i-1,k+1)]
+            self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
+        self.lp_problem += self.a[(i,self.m-1)] == 0 
+        self.lp_problem += self.b[(i,self.m-1)] == 0
+
 
 
