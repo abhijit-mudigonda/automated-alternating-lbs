@@ -82,13 +82,7 @@ class buildLinearProgram:
             i = idx+2
             if op == 0:
                 #slowdown
-                """
-                if self.quantum is True:
-                    self.addGroDownConstraints(i)
-                else:
-                    self.addSlowdownConstraints(i)
-                """
-                self.addRAMSlowdownConstraints(i)
+                self.addGrodownConstraints(i)
             else:
                 #speedup
                 self.addSpeedupConstraints(i)
@@ -194,7 +188,7 @@ class buildLinearProgram:
         self.lp_problem += self.a[(i,self.m-1)] == 0 
         self.lp_problem += self.b[(i,self.m-1)] == 0
 
-    def addRAMSlowdownConstraints(self, i: int) -> None:
+    def add01SlowdownConstraints(self, i: int) -> None:
         """
             Appends the constraints corresponding to this slowdown step to the LP
         """
@@ -208,7 +202,6 @@ class buildLinearProgram:
             self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
         self.lp_problem += self.a[(i,self.m-1)] == 0 
         self.lp_problem += self.b[(i,self.m-1)] == 0
-
 
 
     def addGroDownConstraints(self, i: int) -> None:
