@@ -70,7 +70,7 @@ def annotationGenerator(n: int):
                 m = (n-1)-1
 
 
-def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> Tuple[float, Any]:
+def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> Tuple[float, str]:
     """
         annotation: A list of 0/1 bits encoding an annotation. 0 indicates a slowdown step, 1 indicates a speedup step
         high: the maximum allowable value in binary search
@@ -84,9 +84,9 @@ def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> 
     assert(buildLinearProgram(annotation, low).isFeasible() is True)
     if depth == 0:
         if buildLinearProgram(annotation, high).isFeasible() is True:
-            return high, buildLinearProgram(annotation, high).getProofParams()
+            return high, buildLinearProgram(annotation, high).getReadableProof()
         else:
-            return low, buildLinearProgram(annotation, low).getProofParams()
+            return low, buildLinearProgram(annotation, low).getReadableProof()
 
     mid = (high+low)/2
     if buildLinearProgram(annotation, mid).isFeasible() is True:
@@ -126,6 +126,7 @@ if __name__ == "__main__":
 
     best_c = search_start-0.01
     best_annotations = []
+    best_proofs = []
     
     for annotation in annotationGenerator(proof_length-1):
         #If even the smallest value under consideration fails to yield a feasible program 
@@ -138,17 +139,21 @@ if __name__ == "__main__":
             if buildLinearProgram(annotation, c).isFeasible() is False:
                 #There's no feasible linear program at this value of c.
                 #This means that we should search between c/2 and c
-                annotation_best_c, annotation_best_params = binarySearch(annotation, c/2, c, search_depth)
+                annotation_best_c, annotation_best_proof = binarySearch(annotation, c/2, c, search_depth)
                 if annotation_best_c > best_c:
                     best_c = annotation_best_c
                     best_annotations = [annotation]
-                    best_params = annotation_best_params
+                    best_proofs = [annotation_best_proof]
                 elif annotation_best_c == best_c:
                     best_annotations.append(annotation)
-
+                    best_proofs.append(annotation_best_proof)
                 break
     print("The best annotations were: ", best_annotations)
     print("The best value of c was: ", best_c) 
+    print("The best proofs were: ")
+    for idx, proof in enumerate(best_proofs):
+        print(best_annotations[idx])
+        print(proof)
 
 
 

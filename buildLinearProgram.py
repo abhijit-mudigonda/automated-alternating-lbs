@@ -36,7 +36,7 @@ class buildLinearProgram:
         self.c = c
         self.annotation = annotation
         self.x = pulp.LpVariable.dicts("x", [i for i in range(self.n)], 0) 
-        self.lp_problem = pulp.LpProblem("imnotsurewhathisdoes", pulp.LpMinimize)
+        self.lp_problem = pulp.LpProblem("iwonderwhatthisdoes", pulp.LpMinimize)
         self.quantum = quantum
 
 
@@ -66,7 +66,8 @@ class buildLinearProgram:
         """
             Must be run BEFORE any constraints are added!!
         """
-        self.lp_problem += 0
+        self.lp_problem += pulp.lpSum([self.a[(i,j)] for i in range(self.n) for j in range(self.m)]) + pulp.lpSum([self.b[(i,j)] for i in range(self.n) for j in range(self.m)]) + pulp.lpSum([self.x[i] for i in range(self.n)])
+
 
     def addAnnotationConstraints(self) -> None:
         """
@@ -82,7 +83,7 @@ class buildLinearProgram:
             i = idx+2
             if op == 0:
                 #slowdown
-                self.addGrodownConstraints(i)
+                self.addGroDownConstraints(i)
             else:
                 #speedup
                 self.addSpeedupConstraints(i)
@@ -92,32 +93,68 @@ class buildLinearProgram:
             Returns 1 iff the linear program built from this annotation and this value of c
             is feasible. 
         """
-            
-        self.addObjective()
-        self.addAnnotationConstraints()
-        self.lp_problem.solve()
+        self.solveIfNotSolved()
         if pulp.LpStatus[self.lp_problem.status] == "Optimal":
             return True
         elif pulp.LpStatus[self.lp_problem.status] == "Infeasible":
             return False
         raise ValueError
 
-    def getProofParams(self):
+    def solveIfNotSolved(self) -> None:
         """
-            Returns the variables corresponding to a feasible solution if one exists.
-            TODO typehint
+            Solves the program if it isn't solved 
         """
-
         #if lp is unsolved
         if pulp.LpStatus[self.lp_problem.status] == "Not Solved": 
             self.addObjective()
             self.addAnnotationConstraints()
             self.lp_problem.solve()
 
+    @staticmethod
+    def getQuant(a: bool) -> str:
+        if a is True:
+            return 'E'
+        else:
+            return 'A'
+
+    def getReadableProof(self) -> str:
+        """
+            Yields the proof in human readable format
+        """
+        self.solveIfNotSolved()
         #if the solved program isn't feasible, fail
         assert(pulp.LpStatus[self.lp_problem.status] == "Optimal")
-        return self.lp_problem.variables()
-     
+        #round the solution 
+        self.lp_problem.roundSolution()
+        output = ""
+
+        #print line by line
+        for i in range(self.n):
+            line_out = ""
+            #quant is True when you want to print an exists (E), false for forall (A)
+            quant = True
+            hit_zero = False
+            for j in reversed(range(self.m)):
+                if hit_zero is False:
+                    if self.b[i,j].varValue != 0:
+                        hit_zero = True
+                        if j == 0:
+                            line_out += "DTS[n^"+str(self.a[i,j].varValue)+"]"
+                        else:
+                            quant_out = "(" +  self.getQuant(quant) + "n^" + str(self.a[i,j].varValue) + ")^"
+                            line_out += quant_out
+                            quant = not quant
+                else:
+                    if j == 0:
+                        quant_out = str(self.b[i,j].varValue) + " DTS[n^"+str(self.a[i,j].varValue)+"]"
+                    else:
+                        quant_out = str(self.b[i,j].varValue) + " (" +  self.getQuant(quant) + "n^" + str(self.a[i,j].varValue) + ")^"
+                        quant = not quant
+                    line_out += quant_out
+
+            output += line_out + '\n'
+        return output
+
     def addInitialConstraints(self) -> None:
         """
             Appends the initial constraints on the LP, and those for the first speedup step. 
