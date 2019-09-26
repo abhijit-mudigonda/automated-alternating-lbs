@@ -1,6 +1,8 @@
 This code, based on [research](http://www.cs.cmu.edu/~ryanw/automated-lbs.pdf) and Maple [code](http://www.cs.cmu.edu/~ryanw/LB.txt) by Professor [Ryan Williams](https://people.csail.mit.edu/rrw/), generates alternation-trading proofs of time-space lower bounds for SAT. Loosely, the goal is to prove statements of form 
 
-![NPDTSequation](https://github.com/abhijit-mudigonda/automated-alternating-lbs/images/npdts_eqn.gif)
+
+![NPDTS Equation](https://github.com/abhijit-mudigonda/automated-alternating-lbs/blob/master/images/npdts_eqn.gif)
+
 
 where the goal is to make c as large as possible. 
 
@@ -10,14 +12,12 @@ These proofs consist of a sequence of applications of one of a small set of *rul
 
 To use, run `findBestProof.py` with the arguments you want. 
 
-![Arguments](https://github.com/abhijit-mudigonda/automated-alternating-lbs/images/example_input.png)
-
+![Arguments](https://github.com/abhijit-mudigonda/automated-alternating-lbs/blob/master/images/example_input.png)
 
 
 The output looks something like this. Note that E and A denote existential and universal quantifiers, respectively. To understand the rest of the notation, check out the paper. 
 
 
-![Output](https://github.com/abhijit-mudigonda/automated-alternating-lbs/images/example_output.png)
-
+![Output](https://github.com/abhijit-mudigonda/automated-alternating-lbs/blob/master/images/example_output.png)
 
 
