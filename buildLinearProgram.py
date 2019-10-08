@@ -83,7 +83,7 @@ class buildLinearProgram:
             i = idx+2
             if op == 0:
                 #slowdown
-                self.addGroDownConstraints(i)
+                self.addSlowdownConstraints(i)
             else:
                 #speedup
                 self.addSpeedupConstraints(i)
@@ -217,6 +217,8 @@ class buildLinearProgram:
         self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,1)]
         self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,0)]
         self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,1)]
+        self.lp_problem += self.a[(i,0)] >= 1
+
         self.lp_problem += self.b[(i,0)] == self.b[(i-1,1)]
 
         for k in range(1,self.m-1):
