@@ -136,6 +136,7 @@ if __name__ == "__main__":
         c = search_start
         for i in range(search_cap):
             c *= 2
+            print("Doubling phase, trying c = ", c)
             if buildLinearProgram(annotation, c).isFeasible() is False:
                 #There's no feasible linear program at this value of c.
                 #This means that we should search between c/2 and c
@@ -148,6 +149,7 @@ if __name__ == "__main__":
                     best_annotations.append(annotation)
                     best_proofs.append(annotation_best_proof)
                 break
+    print(buildLinearProgram(annotation, c).getReadableProof())
     print("The best annotations were: ", best_annotations)
     print("The best value of c was: ", best_c) 
     print("The best proofs were: ")

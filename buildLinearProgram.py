@@ -79,14 +79,28 @@ class buildLinearProgram:
         self.addInitialConstraints()
 
         #Everything else, skipping the first speedup since it's in initialize
+        post_speedup = True
+        pre_slowdown = False
         for idx, op in enumerate(self.annotation[1:]):
             i = idx+2
+            if i != len(self.annotation):
+                if self.annotation[idx+2] == 0:
+                    pre_slowdown = True
+                else:
+                    pre_slowdown = False
+            else:
+                pre_slowdown = False
             if op == 0:
                 #slowdown
-                self.addSlowdownConstraints(i)
+                if post_speedup is True and pre_slowdown is True:
+                    self.addGrodown2Constraints(i)
+                else:
+                    self.addGrodown1Constraints(i)
+                post_speedup = False
             else:
                 #speedup
                 self.addSpeedupConstraints(i)
+                post_speedup = True
 
     def isFeasible(self) -> bool:
         """
@@ -227,31 +241,15 @@ class buildLinearProgram:
         self.lp_problem += self.a[(i,self.m-1)] == 0 
         self.lp_problem += self.b[(i,self.m-1)] == 0
 
-    def add01SlowdownConstraints(self, i: int) -> None:
-        """
-            Appends the constraints corresponding to this slowdown step to the LP
-        """
-        self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,0)]
-        self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,1)]
-        self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,0)]
-        self.lp_problem += self.b[(i,0)] == self.b[(i-1,1)]
-
-        for k in range(1,self.m-1):
-            self.lp_problem += self.a[(i,k)] == self.a[(i-1,k+1)]
-            self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
-        self.lp_problem += self.a[(i,self.m-1)] == 0 
-        self.lp_problem += self.b[(i,self.m-1)] == 0
-
-
-    def addGroDownConstraints(self, i: int) -> None:
+    def addGrodown1Constraints(self, i: int) -> None:
         """
            Appends the constraints corresponding to this slowdown step to the LP
         """
-        self.lp_problem += self.a[(i,0)] >= self.c*(self.a[(i-1,0)] - 0.5*self.x[i])
-        self.lp_problem += self.a[(i,0)] >= self.c*self.x[i]
+        #self.lp_problem += self.a[(i,0)] >= self.c*(0.666666667*self.a[(i-1,0)])
         self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,1)]
         self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,0)]
         self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,1)]
+
         self.lp_problem += self.b[(i,0)] == self.b[(i-1,1)]
 
         for k in range(1,self.m-1):
@@ -259,6 +257,21 @@ class buildLinearProgram:
             self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
         self.lp_problem += self.a[(i,self.m-1)] == 0 
         self.lp_problem += self.b[(i,self.m-1)] == 0
+
+    def addGrodown2Constraints(self, i: int) -> None:
+        """
+           Appends the constraints corresponding to this slowdown step to the LP
+        """
+        self.lp_problem += self.a[(i,0)] == self.a[(i-1,0)]+0.5*self.x[i-1] 
+
+        self.lp_problem += self.b[(i,0)] == self.b[(i-1,1)]
+
+        for k in range(1,self.m-1):
+            self.lp_problem += self.a[(i,k)] == self.a[(i-1,k+1)]
+            self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
+        self.lp_problem += self.a[(i,self.m-1)] == 0 
+        self.lp_problem += self.b[(i,self.m-1)] == 0
+
 
 
 
