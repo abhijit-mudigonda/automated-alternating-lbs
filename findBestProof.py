@@ -70,7 +70,7 @@ def annotationGenerator(n: int):
                 m = (n-1)-1
 
 
-def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> Tuple[float, str]:
+def binarySearch(annotation: List[int], low: float, high: float, depth: int, alpha: float) -> Tuple[float, str]:
     """
         annotation: A list of 0/1 bits encoding an annotation. 0 indicates a slowdown step, 1 indicates a speedup step
         high: the maximum allowable value in binary search
@@ -81,18 +81,18 @@ def binarySearch(annotation: List[int], low: float, high: float, depth: int) -> 
     #If even the smallest exponent in the range is infeasible then fail out immediately
     #This guarantees that the output will be feasible. This function shouldn't be called on 
     #infeasible ranges (TODO maybe this is bad behavior)
-    assert(buildLinearProgram(annotation, low).isFeasible() is True)
+    assert(buildLinearProgram(annotation, low, alpha).isFeasible() is True)
     if depth == 0:
-        if buildLinearProgram(annotation, high).isFeasible() is True:
-            return high, buildLinearProgram(annotation, high).getReadableProof()
+        if buildLinearProgram(annotation, high, alpha).isFeasible() is True:
+            return high, buildLinearProgram(annotation, high, alpha).getReadableProof()
         else:
-            return low, buildLinearProgram(annotation, low).getReadableProof()
+            return low, buildLinearProgram(annotation, low, alpha).getReadableProof()
 
     mid = (high+low)/2
-    if buildLinearProgram(annotation, mid).isFeasible() is True:
-        return binarySearch(annotation, mid, high, depth-1)
+    if buildLinearProgram(annotation, mid, alpha).isFeasible() is True:
+        return binarySearch(annotation, mid, high, depth-1, alpha)
     else:
-        return binarySearch(annotation, low, mid, depth-1)
+        return binarySearch(annotation, low, mid, depth-1, alpha)
 
 
 if __name__ == "__main__":
@@ -133,16 +133,15 @@ if __name__ == "__main__":
     for annotation in annotationGenerator(proof_length-1):
         #If even the smallest value under consideration fails to yield a feasible program 
         #for this annotation then we shouldn't bother with the binary searching
-        if buildLinearProgram(annotation, search_start).isFeasible() is False:
+        if buildLinearProgram(annotation, search_start, alpha).isFeasible() is False:
             continue 
         c = search_start
         for i in range(search_cap):
             c *= 2
-            print("Doubling phase, trying c = ", c)
             if buildLinearProgram(annotation, c, alpha).isFeasible() is False:
                 #There's no feasible linear program at this value of c.
                 #This means that we should search between c/2 and c
-                annotation_best_c, annotation_best_proof = binarySearch(annotation, c/2, c, search_depth)
+                annotation_best_c, annotation_best_proof = binarySearch(annotation, c/2, c, search_depth, alpha)
                 if annotation_best_c > best_c:
                     best_c = annotation_best_c
                     best_annotations = [annotation]
@@ -151,7 +150,6 @@ if __name__ == "__main__":
                     best_annotations.append(annotation)
                     best_proofs.append(annotation_best_proof)
                 break
-    #print(buildLinearProgram(annotation, c, alpha).getReadableProof())
     print("The best annotations were: ", best_annotations)
     print("The best value of c was: ", best_c) 
     print("The best proofs were: ")

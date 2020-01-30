@@ -84,7 +84,7 @@ class buildLinearProgram:
             i = idx+2
             if op == 0:
                 #slowdown
-                self.addGrodownConstraints(i)
+                self.addSlowdownConstraints(i)
             else:
                 #speedup
                 self.addSpeedupConstraints(i)
