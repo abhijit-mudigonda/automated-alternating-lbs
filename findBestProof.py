@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Code for automating the synthesis of alternation-tradingi proofs
+Code for automating the synthesis of alternation-trading proofs
 following the ideas of http://www.cs.cmu.edu/~ryanw/automated-lbs.pdf
 and based on the Maple code by Ryan Williams http://www.cs.cmu.edu/~ryanw/LB.txt
 """
@@ -114,6 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--search_start", default = 1, type = float, action = "store", help = "what value of c to start searching from")
     parser.add_argument("--search_cap", default = 3, type = int, action = "store", help = "number of rounds of doubling we allow")
     parser.add_argument("--search_depth", default = 6, type = int, action = "store", help = "number of iterations of binary search we allow")
+    parser.add_argument("--alpha", default = 1.0, type = float, action = "store", help = "value of alpha in generic slowdown rule")
 
     args = parser.parse_args()
 
@@ -121,6 +122,7 @@ if __name__ == "__main__":
     search_start = args.search_start
     search_cap = args.search_cap
     search_depth = args.search_depth
+    alpha = args.alpha
 
     assert(proof_length % 2 == 0)
 
@@ -137,7 +139,7 @@ if __name__ == "__main__":
         for i in range(search_cap):
             c *= 2
             print("Doubling phase, trying c = ", c)
-            if buildLinearProgram(annotation, c).isFeasible() is False:
+            if buildLinearProgram(annotation, c, alpha).isFeasible() is False:
                 #There's no feasible linear program at this value of c.
                 #This means that we should search between c/2 and c
                 annotation_best_c, annotation_best_proof = binarySearch(annotation, c/2, c, search_depth)
@@ -149,7 +151,7 @@ if __name__ == "__main__":
                     best_annotations.append(annotation)
                     best_proofs.append(annotation_best_proof)
                 break
-    print(buildLinearProgram(annotation, c).getReadableProof())
+    #print(buildLinearProgram(annotation, c, alpha).getReadableProof())
     print("The best annotations were: ", best_annotations)
     print("The best value of c was: ", best_c) 
     print("The best proofs were: ")

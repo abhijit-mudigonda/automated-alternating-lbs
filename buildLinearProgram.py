@@ -15,7 +15,7 @@ class buildLinearProgram:
         and there are methods to add constraints and objective functions. In general, <buildLineearProgramisFeasible> is the
         best way to check if a particular annotation can be used to generate a proof with exponent c.
     """
-    def __init__(self, annotation: List[int], c: float, quantum = False) -> None:
+    def __init__(self, annotation: List[int], c: float, alpha: float) -> None:
         """
             annotation: A list of 0/1 bits encoding an annotation. 0 indicates a slowdown step, 1 indicates a speedup step
             c: the exponent against which we wish to prove lower bounds
@@ -34,10 +34,10 @@ class buildLinearProgram:
         self.a = pulp.LpVariable.dicts("a", [(i,j) for i in range(self.n) for j in range(self.m)]) 
         self.b = pulp.LpVariable.dicts("b", [(i,j) for i in range(self.n) for j in range(self.m)]) 
         self.c = c
+        self.alpha = alpha
         self.annotation = annotation
         self.x = pulp.LpVariable.dicts("x", [i for i in range(self.n)], 0) 
         self.lp_problem = pulp.LpProblem("iwonderwhatthisdoes", pulp.LpMinimize)
-        self.quantum = quantum
 
 
     @staticmethod
@@ -69,6 +69,7 @@ class buildLinearProgram:
         self.lp_problem += pulp.lpSum([self.a[(i,j)] for i in range(self.n) for j in range(self.m)]) + pulp.lpSum([self.b[(i,j)] for i in range(self.n) for j in range(self.m)]) + pulp.lpSum([self.x[i] for i in range(self.n)])
 
 
+
     def addAnnotationConstraints(self) -> None:
         """
             Add all the linear program constraints for this annotation and this 
@@ -79,28 +80,14 @@ class buildLinearProgram:
         self.addInitialConstraints()
 
         #Everything else, skipping the first speedup since it's in initialize
-        post_speedup = True
-        pre_slowdown = False
         for idx, op in enumerate(self.annotation[1:]):
             i = idx+2
-            if i != len(self.annotation):
-                if self.annotation[idx+2] == 0:
-                    pre_slowdown = True
-                else:
-                    pre_slowdown = False
-            else:
-                pre_slowdown = False
             if op == 0:
                 #slowdown
-                if post_speedup is True and pre_slowdown is True:
-                    self.addGrodown2Constraints(i)
-                else:
-                    self.addGrodown1Constraints(i)
-                post_speedup = False
+                self.addGrodownConstraints(i)
             else:
                 #speedup
                 self.addSpeedupConstraints(i)
-                post_speedup = True
 
     def isFeasible(self) -> bool:
         """
@@ -136,8 +123,6 @@ class buildLinearProgram:
             Yields the proof in human readable format
         """
         self.solveIfNotSolved()
-        #if the solved program isn't feasible, fail
-        assert(pulp.LpStatus[self.lp_problem.status] == "Optimal")
         #round the solution 
         self.lp_problem.roundSolution()
         output = ""
@@ -227,7 +212,7 @@ class buildLinearProgram:
         """
             Appends the constraints corresponding to this slowdown step to the LP
         """
-        self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,0)]
+        self.lp_problem += self.a[(i,0)] >= self.c*self.alpha*self.a[(i-1,0)]
         self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,1)]
         self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,0)]
         self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,1)]
@@ -240,38 +225,6 @@ class buildLinearProgram:
             self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
         self.lp_problem += self.a[(i,self.m-1)] == 0 
         self.lp_problem += self.b[(i,self.m-1)] == 0
-
-    def addGrodown1Constraints(self, i: int) -> None:
-        """
-           Appends the constraints corresponding to this slowdown step to the LP
-        """
-        #self.lp_problem += self.a[(i,0)] >= self.c*(0.666666667*self.a[(i-1,0)])
-        self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,1)]
-        self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,0)]
-        self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,1)]
-
-        self.lp_problem += self.b[(i,0)] == self.b[(i-1,1)]
-
-        for k in range(1,self.m-1):
-            self.lp_problem += self.a[(i,k)] == self.a[(i-1,k+1)]
-            self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
-        self.lp_problem += self.a[(i,self.m-1)] == 0 
-        self.lp_problem += self.b[(i,self.m-1)] == 0
-
-    def addGrodown2Constraints(self, i: int) -> None:
-        """
-           Appends the constraints corresponding to this slowdown step to the LP
-        """
-        self.lp_problem += self.a[(i,0)] == self.a[(i-1,0)]+0.5*self.x[i-1] 
-
-        self.lp_problem += self.b[(i,0)] == self.b[(i-1,1)]
-
-        for k in range(1,self.m-1):
-            self.lp_problem += self.a[(i,k)] == self.a[(i-1,k+1)]
-            self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
-        self.lp_problem += self.a[(i,self.m-1)] == 0 
-        self.lp_problem += self.b[(i,self.m-1)] == 0
-
 
 
 
