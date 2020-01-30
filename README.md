@@ -4,7 +4,7 @@ This code, based on [research](http://www.cs.cmu.edu/~ryanw/automated-lbs.pdf) a
 ![NPDTS Equation](https://github.com/abhijit-mudigonda/automated-alternating-lbs/blob/master/images/npdts_eqn.gif)
 
 
-where the goal is to make c as large as possible. This code and work is currently under construction to generate new rules that allow bounds against QMA (sort of like "Quantum NP") by using ideas like [Grover's algorithm](https://en.wikipedia.org/wiki/Grover's_algorithm).  
+where the goal is to make c as large as possible. This code and work adds new rules that allow bounds against QMA (sort of like "Quantum NP") by using ideas like [Grover's algorithm](https://en.wikipedia.org/wiki/Grover's_algorithm).  
 
 
 These proofs consist of a sequence of applications of one of a small set of *rules*. By picking the rules in the right order and with the right parameters, we can get better lower bounds. In general, a proof annotation describes an ordering of rules, and we can brute force through the space of allowable annotation sequences. The problem of picking parameters can be reduced to a linear programming problem and solved using [PuLP](https://pypi.org/project/PuLP/). Most of the grunt work happens in `buildLinearProgram.py`, which builds a linear program from a given annotation and value of c. `findBestProof.py` starts at a particular value of c, iteratively doubling and then binary searching to find the largest value of c that still yields a proof. 
