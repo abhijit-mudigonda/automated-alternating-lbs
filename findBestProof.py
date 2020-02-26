@@ -94,6 +94,50 @@ def binarySearch(annotation: List[int], low: float, high: float, depth: int, alp
     else:
         return binarySearch(annotation, low, mid, depth-1, alpha)
 
+def getPaperData():
+    search_start = 1
+    search_cap = 3
+    search_depth = 10
+
+    f = open("paper-data.txt",'w')
+
+    for alpha in [1.0, 2/3, 1/3]:
+        f.write("alpha: " + str(alpha)+'\n')
+        for proof_length in [2*x for x in range(2,9)]:
+            f.write("proof length: "+ str(proof_length)+'\n')
+            best_c = search_start-0.01
+            best_annotations = []
+            
+            for annotation in annotationGenerator(proof_length-1):
+                #If even the smallest value under consideration fails to yield a feasible program 
+                #for this annotation then we shouldn't bother with the binary searching
+                if buildLinearProgram(annotation, search_start, alpha).isFeasible() is False:
+                    continue 
+                c = search_start
+                for i in range(search_cap):
+                    c *= 2
+                    if buildLinearProgram(annotation, c, alpha).isFeasible() is False:
+                        #There's no feasible linear program at this value of c.
+                        #This means that we should search between c/2 and c
+                        annotation_best_c, annotation_best_proof = binarySearch(annotation, c/2, c, search_depth, alpha)
+                        if annotation_best_c > best_c:
+                            best_c = annotation_best_c
+                            best_annotations = [annotation]
+                        elif annotation_best_c == best_c:
+                            best_annotations.append(annotation)
+                        break
+            print("The best annotations were: ", best_annotations)
+            print("The best value of c was: ", best_c) 
+
+            annotation_strings = []
+            for annotation in best_annotations:
+                print(annotation)
+                annotation_strings.append(','.join(str(x) for x in annotation))
+            f.write("Best c is " + str(best_c)+'\n')
+            f.write('['+'],['.join(annotation_strings)+']'+'\n')
+        f.write('\n')
+    return 0
+
 
 if __name__ == "__main__":
     """
@@ -110,11 +154,12 @@ if __name__ == "__main__":
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--proof_length", required = True, type = int, action = "store", help = "finds the best lower bounds using proofs of this length. Must be even")
+    parser.add_argument("proof_length", type = int, action = "store", help = "finds the best lower bounds using proofs of this length. Must be even")
     parser.add_argument("--search_start", default = 1, type = float, action = "store", help = "what value of c to start searching from")
     parser.add_argument("--search_cap", default = 3, type = int, action = "store", help = "number of rounds of doubling we allow")
     parser.add_argument("--search_depth", default = 6, type = int, action = "store", help = "number of iterations of binary search we allow")
     parser.add_argument("--alpha", default = 1.0, type = float, action = "store", help = "value of alpha in generic slowdown rule")
+    parser.add_argument("--dataspew", default = False, type = bool, action = "store")
 
     args = parser.parse_args()
 
@@ -129,6 +174,7 @@ if __name__ == "__main__":
     best_c = search_start-0.01
     best_annotations = []
     best_proofs = []
+    
     
     for annotation in annotationGenerator(proof_length-1):
         #If even the smallest value under consideration fails to yield a feasible program 
