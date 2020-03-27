@@ -291,7 +291,6 @@ def findBestProof():
 
 
 if __name__ == "__main__":
-    for annotation in probAnnotationGenerator(7):
-        print(annotation)
+    findBestProof()
 
 

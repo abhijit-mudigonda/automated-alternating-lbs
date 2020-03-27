@@ -36,6 +36,9 @@ class buildLinearProgram:
         self.c = c
         self.alpha = alpha
         self.annotation = annotation
+        self.rand_speedup = False
+        if self.annotation[0] == 2:
+            self.random = True
         self.x = pulp.LpVariable.dicts("x", [i for i in range(self.n)], 0) 
         self.lp_problem = pulp.LpProblem("iwonderwhatthisdoes", pulp.LpMinimize)
 
@@ -55,8 +58,8 @@ class buildLinearProgram:
                 j -= 1
             #The clause is a SPEEDUP
             else:
-                j += 1
-                m = max(m,j)
+                j += annotation[i]
+        m = max(m,j)
         #We add one for the variables for the TSP[n^a] bit 
         #and one for the extra quantifier added in the first speedup
         m += 2
@@ -159,13 +162,15 @@ class buildLinearProgram:
             Appends the initial constraints on the LP, and those for the first speedup step. 
         """
 
-        #Constraints on the first self.and last lines, which self.are of the form TSP[n^a]. 
+
+        #Constraints on the first self.and last lines, which self.are of the form TS[n^a]. 
         self.lp_problem += self.a[(0,0)] >= 1
         self.lp_problem += self.b[(0,0)] == 1
 
         self.lp_problem += self.a[(self.n-1, 0)] >= 1
         self.lp_problem += self.b[(self.n-1, 0)] == 1
 
+        
         for k in range(1,self.m):
             self.lp_problem += self.a[(0,k)] == 0
             self.lp_problem += self.b[(0,k)] == 0
@@ -175,18 +180,30 @@ class buildLinearProgram:
         #Constraint so that we actually get a lower bound
         self.lp_problem += self.a[(0,0)] >= self.a[(self.n-1,0)]
 
-        #Constraints for the first speedup
+        #Constraints for the first speedup. This depends on whether we're in 
+        #the randomized or normal setting.
+
         self.lp_problem += self.a[(1,0)] == self.a[(0,0)]-self.x[1] 
         self.lp_problem += self.b[(1,0)] == 1
         self.lp_problem += self.a[(1,1)] == 0
         self.lp_problem += self.b[(1,1)] >= self.x[1]
         self.lp_problem += self.b[(1,1)] >= 1 
-        self.lp_problem += self.a[(1,2)] == self.x[1]
-        self.lp_problem += self.b[(1,2)] == 1
 
-        for k in range(3, self.m): 
+        self.lp_problem += self.a[(1,2)] == self.x[1]
+        self.lp_problem += self.b[(1,2)] >= 1
+        self.lp_problem += self.b[(1,2)] >= self.x[1]
+
+        if self.rand_speedup is True:
+            self.lp_problem += self.a[(1,3)] == 0
+            self.lp_problem += self.b[(1,3)] == 1
+        else:
+            self.lp_problem += self.a[(1,3)] == 0
+            self.lp_problem += self.b[(1,3)] == 0
+
+        for k in range(4, self.m): 
             self.lp_problem += self.a[(1,k)] == 0
             self.lp_problem += self.b[(1,k)] == 0
+           
 
     def addSpeedupConstraints(self, i: int) -> None:
         """
@@ -208,6 +225,9 @@ class buildLinearProgram:
             self.lp_problem += self.b[(i,k)] == self.b[(i-1,k-1)] 
 
 
+    def addRandomizedSpeedupConstraints(self) -> None:
+        pass
+    
     def addSlowdownConstraints(self, i: int) -> None:
         """
             Appends the constraints corresponding to this slowdown step to the LP
