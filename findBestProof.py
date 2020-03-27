@@ -13,22 +13,36 @@ from typing import Any, Dict, List, Tuple
 from buildLinearProgram import buildLinearProgram
 
 
-def slowdownInsertIndexGenerator(A: List[int], n: int):
+def InsertZeroIndexGenerator(all_speedups: List[int], rand_speedups: List[int]):
     """
-        Given a list of integers [a_1, ..., a_k] where 0 < a_i < n this generator will output 
-        lists [b_1, ..., b_k] so that a_i < b_i < n for every i. 
+        all_speedups: A sorted list of integers denoting the indices of any 1 or 2
+        rand_speedups: A sorted list of integers denoting the indices *within all_speedups* 
+            that correspond to 2s
+
+        yields: A list of indices where 0s should be inserted in the annotation
     """
 
-    B = A
-    k = len(A)
-    while(B[0] < n):
-        B[k-1] += 1
-        for i in range(k-1,0,-1):
-            if B[i] == n:
-                B[i] = 0
-                B[i-1] += 1
-    yield B
+    assert(all_speedups == sorted(all_speedups))
+    assert(rand_speedups == sorted(rand_speedups))
 
+    m = len(all_speedups) 
+    k = len(rand_speedups)
+    if k == 0:
+        yield []
+    else:
+        idxs_in_all_speedups = rand_speedups
+        while(idxs_in_all_speedups[0] < m):
+            print("Insert zeros at the following speedups:", idxs_in_all_speedups)
+            outputs = [all_speedups[elt]+1 for elt in idxs_in_all_speedups]
+            print("Insert zeros at the following indices:", outputs)
+            yield outputs 
+
+            idxs_in_all_speedups[k-1] += 1
+            for i in range(k-1,0,-1):
+                if idxs_in_all_speedups[i] == m:
+                    idxs_in_all_speedups[i-1] += 1
+                    idxs_in_all_speedups[i] = min(max(idxs_in_all_speedups[i-1], rand_speedups[i]), m-1)
+            
 def insertZeros(A: List[int], B: List[int]) -> List[int]:
     """
         A: a list consisting of elements {0,1,2}
@@ -38,7 +52,7 @@ def insertZeros(A: List[int], B: List[int]) -> List[int]:
         outputs: an updated list
     """
 
-    assert(B = sorted(B))
+    assert(B == sorted(B))
     for idx, b in enumerate(B):
         A.insert(b+idx,0)
     return A
@@ -64,13 +78,25 @@ def probAnnotationGenerator(n: int):
     """
 
     for annotation in annotationGenerator(n):
-        speedup_2s = []
-        for i in range(1, len(annotation)):
-            if annotation[i] == 1 and annotation[i-1] == 0:
-                annotation[i] = 2
-                speedup_2s.append(i)
-        for insert_0_idxs in slowdownInsertIndexGenerator(speedup_2s, n):
-            yield insertZeros(annotation, insert_0_idxs)
+        print("Annotation:", annotation)
+        all_speedup_islands = []
+        rand_speedups = []
+        for i in range(0, len(annotation)):
+            if i == 0:
+                annotation[0] = 2
+                ctr = 0
+                rand_speedups.append(0)
+            elif annotation[i] == 0 and annotation[i-1] > 0:
+                all_speedup_islands.append(i-1)
+                ctr += 1
+            elif annotation[i] == 1 and annotation[i-1] == 0:
+                    annotation[i] = 2
+                    rand_speedups.append(ctr)
+
+        print("Speedups at", all_speedup_islands, "for annotation", annotation)
+        print("Randomized are indices", rand_speedups, "of the former")
+        for insert_0_idxs in InsertZeroIndexGenerator(all_speedup_islands, rand_speedups):
+            yield insertZeros(annotation.copy(), insert_0_idxs)
     
 
 def annotationGenerator(n: int):
@@ -199,8 +225,7 @@ def getPaperData():
         f.write('\n')
     return 0
 
-
-if __name__ == "__main__":
+def findBestProof():
     """
         proof_length: how many lines the proof is allowed to be
        search_cap: how many doubling iterations we allow in the search
@@ -264,5 +289,9 @@ if __name__ == "__main__":
         print(best_annotations[idx])
         print(proof)
 
+
+if __name__ == "__main__":
+    for annotation in probAnnotationGenerator(7):
+        print(annotation)
 
 
