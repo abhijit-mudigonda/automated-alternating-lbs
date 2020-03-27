@@ -31,7 +31,6 @@ class buildLinearProgram:
         """
         self.m = buildLinearProgram.maxNumClauses(annotation)
         self.n = len(annotation)+1
-        self.a = pulp.LpVariable.dicts("a", [(i,j) for i in range(self.n) for j in range(self.m)]) 
         self.b = pulp.LpVariable.dicts("b", [(i,j) for i in range(self.n) for j in range(self.m)]) 
         self.c = c
         self.alpha = alpha
@@ -69,7 +68,7 @@ class buildLinearProgram:
         """
             Must be run BEFORE any constraints are added!!
         """
-        self.lp_problem += pulp.lpSum([self.a[(i,j)] for i in range(self.n) for j in range(self.m)]) + pulp.lpSum([self.b[(i,j)] for i in range(self.n) for j in range(self.m)]) + pulp.lpSum([self.x[i] for i in range(self.n)])
+        self.lp_problem += pulp.lpSum([self.b[(i,j)] for i in range(self.n) for j in range(self.m)]) + pulp.lpSum([self.x[i] for i in range(self.n)])
 
 
 
@@ -141,9 +140,9 @@ class buildLinearProgram:
                     if self.b[i,j].varValue != 0:
                         hit_zero = True
                         if j == 0:
-                            line_out += "DTS[n^"+str(self.a[i,j].varValue)+"]"
+                            line_out += "DTS[n^"+str(self.b[i,j].varValue)+"]"
                         else:
-                            quant_out = "(" +  self.getQuant(quant) + "n^" + str(self.a[i,j].varValue) + ")^"
+                            quant_out = "(" +  self.getQuant(quant) + "n^" + str(self.b[i,j].varValue) + ")^"
                             line_out += quant_out
                             quant = not quant
                 else:
@@ -164,44 +163,31 @@ class buildLinearProgram:
 
 
         #Constraints on the first self.and last lines, which self.are of the form TS[n^a]. 
-        self.lp_problem += self.a[(0,0)] >= 1
-        self.lp_problem += self.b[(0,0)] == 1
+        self.lp_problem += self.b[(0,0)] >= 1
 
-        self.lp_problem += self.a[(self.n-1, 0)] >= 1
-        self.lp_problem += self.b[(self.n-1, 0)] == 1
+        self.lp_problem += self.b[(self.n-1, 0)] >= 1
 
-        
         for k in range(1,self.m):
-            self.lp_problem += self.a[(0,k)] == 0
             self.lp_problem += self.b[(0,k)] == 0
-            self.lp_problem += self.a[(self.n-1,k)] == 0
             self.lp_problem += self.b[(self.n-1,k)] == 0
         
         #Constraint so that we actually get a lower bound
-        self.lp_problem += self.a[(0,0)] >= self.a[(self.n-1,0)]
+        self.lp_problem += self.b[(0,0)] >= self.b[(self.n-1,0)]
 
         #Constraints for the first speedup. This depends on whether we're in 
         #the randomized or normal setting.
 
-        self.lp_problem += self.a[(1,0)] == self.a[(0,0)]-self.x[1] 
-        self.lp_problem += self.b[(1,0)] == 1
-        self.lp_problem += self.a[(1,1)] == 0
-        self.lp_problem += self.b[(1,1)] >= self.x[1]
-        self.lp_problem += self.b[(1,1)] >= 1 
-
-        self.lp_problem += self.a[(1,2)] == self.x[1]
+        self.lp_problem += self.b[(1,0)] == self.b[(0,0)]-self.x[1] 
+        self.lp_problem += self.b[(1,1)] == 1
         self.lp_problem += self.b[(1,2)] >= 1
         self.lp_problem += self.b[(1,2)] >= self.x[1]
 
-        if self.rand_speedup is True:
-            self.lp_problem += self.a[(1,3)] == 0
+        if self.annotation[0] == 2:
             self.lp_problem += self.b[(1,3)] == 1
         else:
-            self.lp_problem += self.a[(1,3)] == 0
             self.lp_problem += self.b[(1,3)] == 0
 
         for k in range(4, self.m): 
-            self.lp_problem += self.a[(1,k)] == 0
             self.lp_problem += self.b[(1,k)] == 0
            
 
@@ -210,40 +196,29 @@ class buildLinearProgram:
             Appends the constraints corresponding to this speedup step to the LP
         """
 
-        self.lp_problem += self.a[(i,0)] >= 1
-        self.lp_problem += self.a[(i,0)] >= self.a[(i-1,0)] - self.x[i]
-        self.lp_problem += self.b[(i,0)] >= self.b[(i-1,0)]
-        self.lp_problem += self.a[(i,1)] == 0
-        self.lp_problem += self.b[(i,1)] >= self.x[i]
-        self.lp_problem += self.b[(i,1)] >= self.b[(i-1,0)]
-        self.lp_problem += self.a[(i,2)] >= self.a[(i-1,1)] 
-        self.lp_problem += self.a[(i,2)] >= self.x[i]
+        self.lp_problem += self.b[(i,0)] >= self.b[(i-1,0)] - self.x[i]
+        self.lp_problem += self.b[(i,1)] == self.b[(i-1,1)]
+        self.lp_problem += self.b[(i,2)] >= self.x[i]
         self.lp_problem += self.b[(i,2)] >= self.b[(i-1,1)]
         
-        for k in range(3,self.m):
-            self.lp_problem += self.a[(i,k)] == self.a[(i-1,k-1)]
-            self.lp_problem += self.b[(i,k)] == self.b[(i-1,k-1)] 
+        if self.annotation[i] == 1:
+            for k in range(3,self.m):
+                self.lp_problem += self.b[(i,k)] == self.b[(i-1,k-1)] 
+        else: 
+            self.lp_problem += self.b[(i,3)] == self.b[(i-1,1)]
+            for k in range(4,self.m):
+                self.lp_problem += self.b[(i,k)] == self.b[(i-1,k-2)] 
 
-
-    def addRandomizedSpeedupConstraints(self) -> None:
-        pass
-    
     def addSlowdownConstraints(self, i: int) -> None:
         """
             Appends the constraints corresponding to this slowdown step to the LP
         """
-        self.lp_problem += self.a[(i,0)] >= self.c*self.alpha*self.a[(i-1,0)]
-        self.lp_problem += self.a[(i,0)] >= self.c*self.a[(i-1,1)]
-        self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,0)]
-        self.lp_problem += self.a[(i,0)] >= self.c*self.b[(i-1,1)]
-        self.lp_problem += self.a[(i,0)] >= 1
-
-        self.lp_problem += self.b[(i,0)] == self.b[(i-1,1)]
+        self.lp_problem += self.b[(i,0)] >= self.c*self.alpha*self.b[(i-1,0)]
+        self.lp_problem += self.b[(i,0)] >= self.c*self.b[(i-1,1)]
+        self.lp_problem += self.b[(i,0)] >= self.c*self.b[(i-1,2)]
 
         for k in range(1,self.m-1):
-            self.lp_problem += self.a[(i,k)] == self.a[(i-1,k+1)]
             self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
-        self.lp_problem += self.a[(i,self.m-1)] == 0 
         self.lp_problem += self.b[(i,self.m-1)] == 0
 
 
