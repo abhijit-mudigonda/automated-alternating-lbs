@@ -12,6 +12,67 @@ import pulp
 from typing import Any, Dict, List, Tuple
 from buildLinearProgram import buildLinearProgram
 
+
+def slowdownInsertIndexGenerator(A: List[int], n: int):
+    """
+        Given a list of integers [a_1, ..., a_k] where 0 < a_i < n this generator will output 
+        lists [b_1, ..., b_k] so that a_i < b_i < n for every i. 
+    """
+
+    B = A
+    k = len(A)
+    while(B[0] < n):
+        B[k-1] += 1
+        for i in range(k-1,0,-1):
+            if B[i] == n:
+                B[i] = 0
+                B[i-1] += 1
+    yield B
+
+def insertZeros(A: List[int], B: List[int]) -> List[int]:
+    """
+        A: a list consisting of elements {0,1,2}
+        B: a list of indices after which 0s will be added
+        in sorted order
+
+        outputs: an updated list
+    """
+
+    assert(B = sorted(B))
+    for idx, b in enumerate(B):
+        A.insert(b+idx,0)
+    return A
+
+def probAnnotationGenerator(n: int):
+    """
+        n: an integer
+
+        yields: a list of integers 
+
+        A generator that yields valid proof annotations with floor(n/2) speedups  assuming a slowdown rule of form
+        X \subseteq \BPTS[n^c] and using a three-quantifier speedup for BPTS machines (rather than 
+        the two quantifier speedup for normal machines). This requires that we apply the 
+        three quantifier speedup immediately after a slowdown, and two quantifier afterwards. As such, the
+        annotations must look different to match this. 
+
+        1 denotes a normal (two-quantifier) SPEEDUP
+        2 denotes a randomized (three-quantifier) SPEEDUP
+        0 denotes a SLOWDOWN
+
+        We will produce such strings by looking at strings produced by the annotationGenerator and modifying them 
+        by adding a number of 0s corresponding to the number of speedups immediately following slowdowns ('01's). 
+    """
+
+    for annotation in annotationGenerator(n):
+        speedup_2s = []
+        for i in range(1, len(annotation)):
+            if annotation[i] == 1 and annotation[i-1] == 0:
+                annotation[i] = 2
+                speedup_2s.append(i)
+        for insert_0_idxs in slowdownInsertIndexGenerator(speedup_2s, n):
+            yield insertZeros(annotation, insert_0_idxs)
+    
+
 def annotationGenerator(n: int):
     """
         n: an integer
