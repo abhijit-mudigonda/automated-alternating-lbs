@@ -32,9 +32,7 @@ def InsertZeroIndexGenerator(all_speedups: List[int], rand_speedups: List[int]):
     else:
         idxs_in_all_speedups = rand_speedups
         while(idxs_in_all_speedups[0] < m):
-            print("Insert zeros at the following speedups:", idxs_in_all_speedups)
             outputs = [all_speedups[elt]+1 for elt in idxs_in_all_speedups]
-            print("Insert zeros at the following indices:", outputs)
             yield outputs 
 
             idxs_in_all_speedups[k-1] += 1
@@ -78,7 +76,6 @@ def probAnnotationGenerator(n: int):
     """
 
     for annotation in annotationGenerator(n):
-        print("Annotation:", annotation)
         all_speedup_islands = []
         rand_speedups = []
         for i in range(0, len(annotation)):
@@ -93,13 +90,11 @@ def probAnnotationGenerator(n: int):
                     annotation[i] = 2
                     rand_speedups.append(ctr)
 
-        print("Speedups at", all_speedup_islands, "for annotation", annotation)
-        print("Randomized are indices", rand_speedups, "of the former")
         for insert_0_idxs in InsertZeroIndexGenerator(all_speedup_islands, rand_speedups):
             yield insertZeros(annotation.copy(), insert_0_idxs)
     
 
-def annotationGenerator(n: int):
+def detAnnotationGenerator(n: int):
     """
         n: an integer
 
@@ -155,6 +150,18 @@ def annotationGenerator(n: int):
                     break
                 curr[j] = 1
                 m = (n-1)-1
+
+
+def annotationGenerator(n: int, prob: bool):
+    """
+        n: an integer describing the number of speedups (and roughly the proof length)
+        rand: True if we should distinguish between two and three quantifier speedups (and adjust annotations to match), 
+            false otherwise. Basically, true if the RHS of assumption is a containment in BPTS, false if TS
+    """
+    if prob is True:
+        yield from probAnnotation(n)
+    else:
+        yield from detAnnotation(n)
 
 
 def binarySearch(annotation: List[int], low: float, high: float, depth: int, alpha: float) -> Tuple[float, str]:
@@ -244,8 +251,8 @@ def findBestProof():
     parser.add_argument("--search_start", default = 1, type = float, action = "store", help = "what value of c to start searching from")
     parser.add_argument("--search_cap", default = 3, type = int, action = "store", help = "number of rounds of doubling we allow")
     parser.add_argument("--search_depth", default = 6, type = int, action = "store", help = "number of iterations of binary search we allow")
-    parser.add_argument("--alpha", default = 1.0, type = float, action = "store", help = "value of alpha in generic slowdown rule")
-    parser.add_argument("--dataspew", default = False, type = bool, action = "store")
+    parser.add_argument("--prob", default = False, type = bool, action = "store", help = "true if you want bounds against randomized logspace")
+    parser.add_argument("--quantum", default = False, type = bool, action = "store", help = "true if you want bounds for quantum machines")
 
     args = parser.parse_args()
 
@@ -253,7 +260,8 @@ def findBestProof():
     search_start = args.search_start
     search_cap = args.search_cap
     search_depth = args.search_depth
-    alpha = args.alpha
+    prob = args.prob
+    quantum = args.quantum
 
     assert(proof_length % 2 == 0)
 
@@ -262,7 +270,9 @@ def findBestProof():
     best_proofs = []
     
     
-    for annotation in annotationGenerator(proof_length-1):
+
+    
+    for annotation in annotationGenerator(proof_length-1, prob):
         #If even the smallest value under consideration fails to yield a feasible program 
         #for this annotation then we shouldn't bother with the binary searching
         if buildLinearProgram(annotation, search_start, alpha).isFeasible() is False:

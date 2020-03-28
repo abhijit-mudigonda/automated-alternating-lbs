@@ -35,9 +35,6 @@ class buildLinearProgram:
         self.c = c
         self.alpha = alpha
         self.annotation = annotation
-        self.rand_speedup = False
-        if self.annotation[0] == 2:
-            self.random = True
         self.x = pulp.LpVariable.dicts("x", [i for i in range(self.n)], 0) 
         self.lp_problem = pulp.LpProblem("iwonderwhatthisdoes", pulp.LpMinimize)
 
@@ -58,7 +55,7 @@ class buildLinearProgram:
             #The clause is a SPEEDUP
             else:
                 j += annotation[i]
-        m = max(m,j)
+            m = max(m,j)
         #We add one for the variables for the TSP[n^a] bit 
         #and one for the extra quantifier added in the first speedup
         m += 2
@@ -82,14 +79,18 @@ class buildLinearProgram:
         self.addInitialConstraints()
 
         #Everything else, skipping the first speedup since it's in initialize
-        for idx, op in enumerate(self.annotation[1:]):
-            i = idx+2
-            if op == 0:
+        for idx, op in enumerate(self.annotation):
+            if idx == 0:
+                pass
+            elif op == 0:
                 #slowdown
-                self.addSlowdownConstraints(i)
+                #+1 because we want the i^th step of the annotation to tell us about
+                #line i+1 of the proof and this is an artifact of some old code
+                #that I haven't fixed yet TODO 
+                self.addSlowdownConstraints(idx+1)
             else:
                 #speedup
-                self.addSpeedupConstraints(i)
+                self.addSpeedupConstraints(idx+1)
 
     def isFeasible(self) -> bool:
         """
@@ -147,12 +148,12 @@ class buildLinearProgram:
                             quant = not quant
                 else:
                     if j == 0:
-                        quant_out = str(self.b[i,j].varValue) + " DTS[n^"+str(self.a[i,j].varValue)+"]"
+                        quant_out = " DTS[n^"+str(self.b[i,j].varValue)+"]"
                     else:
-                        quant_out = str(self.b[i,j].varValue) + " (" +  self.getQuant(quant) + "n^" + str(self.a[i,j].varValue) + ")^"
+                        quant_out = " (" +  self.getQuant(quant) + "n^" + str(self.b[i,j].varValue) + ")^"
                         quant = not quant
                     line_out += quant_out
-
+                
             output += line_out + '\n'
         return output
 
@@ -184,11 +185,12 @@ class buildLinearProgram:
 
         if self.annotation[0] == 2:
             self.lp_problem += self.b[(1,3)] == 1
+            for k in range(4, self.m): 
+                self.lp_problem += self.b[(1,k)] == 0
         else:
-            self.lp_problem += self.b[(1,3)] == 0
+            for k in range(3, self.m): 
+                self.lp_problem += self.b[(1,k)] == 0
 
-        for k in range(4, self.m): 
-            self.lp_problem += self.b[(1,k)] == 0
            
 
     def addSpeedupConstraints(self, i: int) -> None:
@@ -201,7 +203,8 @@ class buildLinearProgram:
         self.lp_problem += self.b[(i,2)] >= self.x[i]
         self.lp_problem += self.b[(i,2)] >= self.b[(i-1,1)]
         
-        if self.annotation[i] == 1:
+        assert(self.annotation[i-1] != 0)
+        if self.annotation[i-1] == 1:
             for k in range(3,self.m):
                 self.lp_problem += self.b[(i,k)] == self.b[(i-1,k-1)] 
         else: 
@@ -213,13 +216,18 @@ class buildLinearProgram:
         """
             Appends the constraints corresponding to this slowdown step to the LP
         """
-        self.lp_problem += self.b[(i,0)] >= self.c*self.alpha*self.b[(i-1,0)]
+        
+        #If the slowdown is preceded by a speedup then 2/3. If c < 1.5 then 2/3 
+        assert(self.annotation[i-1] == 0)
+        if self.annotation[i-2] == 0 
+            self.lp_problem += self.b[(i,0)] >= self.c*self.b[(i-1,0)]
+        else:
+            self.lp_problem += self.b[(i,0)] >= self.c*self.b[(i-1,0)]
+
         self.lp_problem += self.b[(i,0)] >= self.c*self.b[(i-1,1)]
         self.lp_problem += self.b[(i,0)] >= self.c*self.b[(i-1,2)]
 
         for k in range(1,self.m-1):
             self.lp_problem += self.b[(i,k)] == self.b[(i-1,k+1)]
         self.lp_problem += self.b[(i,self.m-1)] == 0
-
-
 
